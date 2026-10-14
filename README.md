@@ -131,7 +131,7 @@ The core project is considered complete when users can register and log in, crea
 
 ## Team
 
-This project is developed collaboratively by seven students under the guidance of the project trainer.
+This project is developed collaboratively by  students under the guidance of the project trainer.
 
 See GitHub Issues and Projects for current assignments, progress and contributions.
 
