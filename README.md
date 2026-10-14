@@ -1,4 +1,5 @@
-![Uploading OpsDesk Helpdesk Dashboard Suite.png…]()
+<img width="1536" height="1024" alt="OpsDesk Helpdesk Dashboard Suite" src="https://github.com/user-attachments/assets/65577e03-8b7a-4138-afa8-c6f7881c5bff" />
+
 # OpsDesk — IT Support & Incident Management System
 
 A collaborative MERN Stack mini project developed by the DevOps training batch to simulate a real-world IT support and incident management platform.
