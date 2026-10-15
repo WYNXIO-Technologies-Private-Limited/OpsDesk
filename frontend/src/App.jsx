@@ -1,5 +1,5 @@
-import LoginPage from "./components/LoginPage";
+import Register from "./components/Register";
 
 export default function App() {
-  return <LoginPage />;
+  return <Register />;
 }
