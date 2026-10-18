@@ -1,26 +1,83 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./LoginPage.css";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const location = useLocation();
   const [message, setMessage] = useState(location.state?.message || "");
+  const [messageType, setMessageType] = useState(
+    location.state?.message ? "success" : ""
+  );
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setMessage("");
+    setMessageType("");
 
-    if (!email.trim() || !password) {
-      setMessage("Please enter your email and password.");
+    const nextErrors = {};
+    const normalizedUsername = email.trim();
+
+    if (!normalizedUsername) {
+      nextErrors.email = "Enter your email address.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedUsername)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+
+    if (!password) {
+      nextErrors.password = "Enter your password.";
+    }
+
+    setErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setMessage("Please correct the highlighted fields.");
+      setMessageType("error");
       return;
     }
 
-    setMessage("Demo only: connect this form to the authentication API.");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalizedUsername, password }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed. Check your credentials.");
+      }
+
+      if (data.token) {
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem("opsdesk-token", data.token);
+        if (data.user) {
+          storage.setItem("opsdesk-user", JSON.stringify(data.user));
+        }
+      }
+
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setMessage(
+        error.message === "Failed to fetch"
+          ? "Unable to connect to the server. Please try again."
+          : error.message || "Something went wrong. Please try again."
+      );
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -143,7 +200,7 @@ export default function LoginPage() {
               <p>Login to your OpsDesk account</p>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="login-input-shell">
                 <svg className="login-input-icon" viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" strokeWidth="1.8"
@@ -157,13 +214,19 @@ export default function LoginPage() {
                   id="login-email"
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setErrors((current) => ({ ...current, email: "" }));
+                  }}
                   placeholder="user@example.com"
                   autoComplete="email"
                   aria-label="Email address"
                   required
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? "login-email-error" : undefined}
                 />
               </div>
+              {errors.email && <p className="login-field-error" id="login-email-error">{errors.email}</p>}
 
               <div className="login-input-shell">
                 <svg className="login-input-icon" viewBox="0 0 24 24"
@@ -179,11 +242,16 @@ export default function LoginPage() {
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setErrors((current) => ({ ...current, password: "" }));
+                  }}
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   aria-label="Password"
                   required
+                  aria-invalid={Boolean(errors.password)}
+                  aria-describedby={errors.password ? "login-password-error" : undefined}
                 />
 
                 <button
@@ -202,6 +270,7 @@ export default function LoginPage() {
                   </svg>
                 </button>
               </div>
+              {errors.password && <p className="login-field-error" id="login-password-error">{errors.password}</p>}
 
               <div className="login-options">
                 <label className="login-remember">
@@ -225,15 +294,15 @@ export default function LoginPage() {
               </div>
 
               <p
-                className="login-message"
+                className={`login-message ${messageType ? `login-message-${messageType}` : ""}`}
                 role="status"
                 aria-live="polite"
               >
                 {message}
               </p>
 
-              <button type="submit" className="login-submit">
-                Login
+              <button type="submit" className="login-submit" disabled={loading}>
+                {loading ? "Signing in..." : "Login"}
               </button>
             </form>
 
