@@ -1,6 +1,7 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "./LoginPage.css";
 
 export default function LoginPage() {
@@ -10,17 +11,27 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const location = useLocation();
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [message, setMessage] = useState(location.state?.message || "");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setMessage("");
+    setLoading(true);
 
-    if (!email.trim() || !password) {
-      setMessage("Please enter your email and password.");
-      return;
+    try {
+      const user = await login(email.trim(), password, rememberMe);
+
+      navigate(user.role === "admin" ? "/admin" : "/dashboard", {
+        replace: true,
+      });
+    } catch (error) {
+      setMessage(error.message || "Login failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
     }
-
-    setMessage("Demo only: connect this form to the authentication API.");
   }
 
   return (
@@ -232,8 +243,8 @@ export default function LoginPage() {
                 {message}
               </p>
 
-              <button type="submit" className="login-submit">
-                Login
+              <button type="submit" className="login-submit" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
               </button>
             </form>
 
