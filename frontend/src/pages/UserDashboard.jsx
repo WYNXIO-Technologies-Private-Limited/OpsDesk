@@ -4,6 +4,7 @@ import { apiRequest } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import StatCard from "../components/StatCard";
 import TicketTable from "../components/TicketTable";
+import NotificationPreview from "../components/NotificationPreview";
 
 export default function UserDashboard() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export default function UserDashboard() {
     <section className="content-card"><div className="card-heading"><div><h2>Recent tickets</h2><p>Track the latest updates to your requests.</p></div><Link to="/tickets">View all →</Link></div>
       {loading ? <p className="loading-text">Loading tickets…</p> : <TicketTable tickets={tickets.slice(0, 8)} />}
     </section>
+    <NotificationPreview />
     <div className="help-banner"><div><strong>Need help with something else?</strong><p>Create a support ticket and our team will take it from there.</p></div><Link className="secondary-button" to="/tickets/new">Report an issue</Link></div>
   </div>;
 }

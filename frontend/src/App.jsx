@@ -10,6 +10,7 @@ import TicketsPage from "./pages/TicketsPage.jsx";
 import CreateTicket from "./pages/CreateTicket";
 import AdminUsers from "./pages/AdminUsers";
 import ProfilePage from "./pages/ProfilePage";
+import NotificationsPage from "./pages/NotificationsPage";
 import "./dashboard.css";
 
 function HomeRedirect() {
@@ -29,6 +30,7 @@ function AppRoutes() {
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/tickets/new" element={<CreateTicket />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
     </Route>
     <Route element={<ProtectedRoute role="admin" />}>
@@ -36,6 +38,7 @@ function AppRoutes() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/tickets" element={<TicketsPage />} />
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
     </Route>
     <Route path="*" element={<HomeRedirect />} />

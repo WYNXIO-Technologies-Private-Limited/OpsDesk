@@ -1,16 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiRequest } from "../services/api";
+import { useNotifications } from "../context/useNotifications";
 
 export default function CreateTicket() {
   const [form, setForm] = useState({ title: "", description: "", category: "General", priority: "Medium" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { refreshNotifications } = useNotifications();
   const navigate = useNavigate();
   function update(e) { setForm({ ...form, [e.target.name]: e.target.value }); }
   async function submit(e) {
     e.preventDefault(); setError(""); setLoading(true);
-    try { await apiRequest("/tickets", { method: "POST", body: JSON.stringify(form) }); navigate("/tickets", { replace: true }); }
+    try {
+      await apiRequest("/tickets", { method: "POST", body: JSON.stringify(form) });
+      await refreshNotifications();
+      navigate("/tickets", { replace: true });
+    }
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }

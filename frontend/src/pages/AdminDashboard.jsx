@@ -4,8 +4,11 @@ import { Link } from "react-router-dom";
 import { apiRequest } from "../services/api";
 import StatCard from "../components/StatCard";
 import TicketTable from "../components/TicketTable";
+import NotificationPreview from "../components/NotificationPreview";
+import { useNotifications } from "../context/useNotifications";
 
 export default function AdminDashboard() {
+  const { refreshNotifications } = useNotifications();
   const [overview, setOverview] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [error, setError] = useState("");
@@ -29,7 +32,8 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    const refreshId = window.setTimeout(refresh, 0);
+    return () => window.clearTimeout(refreshId);
   }, [refresh]);
 
   async function changeStatus(id, status) {
@@ -39,6 +43,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({ status }),
       });
 
+      await refreshNotifications();
       await refresh();
     } catch (err) {
       setError(err.message || "Unable to update ticket status.");
@@ -161,6 +166,7 @@ export default function AdminDashboard() {
               onStatusChange={changeStatus}
             />
           </section>
+          <NotificationPreview />
         </>
       )}
     </div>
