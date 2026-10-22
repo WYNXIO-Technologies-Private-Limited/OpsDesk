@@ -1,9 +1,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { apiRequest } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function TicketsPage() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const isAdmin = user?.role === "admin";
+
   const [tickets, setTickets] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -11,18 +16,23 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatingTicketId, setUpdatingTicketId] = useState(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(location.state?.toast || "");
 
   const loadTickets = useCallback(async (manual = false) => {
-    if (manual) setRefreshing(true);
-    else setLoading(true);
+    if (manual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     try {
       const data = await apiRequest("/tickets");
       setTickets(data.tickets || []);
       setError("");
     } catch (err) {
-      setError(err.message || "Unable to load your tickets.");
+      setError(err.message || "Unable to load tickets.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -33,6 +43,35 @@ export default function TicketsPage() {
     loadTickets();
   }, [loadTickets]);
 
+  async function changeStatus(ticketId, status) {
+    setError("");
+    setSuccess("");
+    setUpdatingTicketId(ticketId);
+
+    try {
+      await apiRequest(`/tickets/${ticketId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+
+      setSuccess(`Ticket status updated to "${status}".`);
+
+      await loadTickets(true);
+
+      setSelectedTicket((current) => {
+        if (!current || current._id !== ticketId) {
+          return current;
+        }
+
+        return { ...current, status };
+      });
+    } catch (err) {
+      setError(err.message || "Unable to update ticket status.");
+    } finally {
+      setUpdatingTicketId(null);
+    }
+  }
+
   const filteredTickets = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -42,7 +81,11 @@ export default function TicketsPage() {
         ticket.description,
         ticket.category,
         ticket._id,
-      ].some((value) => String(value || "").toLowerCase().includes(query));
+        ticket.createdBy?.name,
+        ticket.createdBy?.email,
+      ].some((value) =>
+        String(value || "").toLowerCase().includes(query)
+      );
 
       const matchesStatus =
         statusFilter === "All" || ticket.status === statusFilter;
@@ -56,15 +99,20 @@ export default function TicketsPage() {
 
   const counts = {
     total: tickets.length,
-    open: tickets.filter((t) => t.status === "Open").length,
-    progress: tickets.filter((t) => t.status === "In Progress").length,
-    resolved: tickets.filter((t) => t.status === "Resolved").length,
+    open: tickets.filter((ticket) => ticket.status === "Open").length,
+    progress: tickets.filter(
+      (ticket) => ticket.status === "In Progress"
+    ).length,
+    resolved: tickets.filter(
+      (ticket) => ticket.status === "Resolved"
+    ).length,
   };
 
   function formatDate(date) {
     if (!date) return "—";
 
     const parsed = new Date(date);
+
     return Number.isNaN(parsed.getTime())
       ? "—"
       : parsed.toLocaleDateString("en-IN", {
@@ -78,13 +126,22 @@ export default function TicketsPage() {
     <div className="dashboard-page tickets-page">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">SUPPORT WORKSPACE</span>
-          <h1>My Tickets</h1>
-          <p>Track your support requests and follow their progress.</p>
+          <span className="eyebrow">
+            {isAdmin ? "ADMINISTRATION" : "SUPPORT WORKSPACE"}
+          </span>
+
+          <h1>{isAdmin ? "All Tickets" : "My Tickets"}</h1>
+
+          <p>
+            {isAdmin
+              ? "Review support requests and manage ticket status."
+              : "Track your support requests and follow their progress."}
+          </p>
         </div>
 
         <div className="ticket-page-actions">
           <button
+            type="button"
             className="secondary-button"
             onClick={() => loadTickets(true)}
             disabled={loading || refreshing}
@@ -92,49 +149,89 @@ export default function TicketsPage() {
             {refreshing ? "Refreshing..." : "↻ Refresh"}
           </button>
 
-          <Link className="primary-button compact" to="/tickets/new">
-            + Create ticket
-          </Link>
+          {!isAdmin && (
+            <Link
+              className="primary-button compact"
+              to="/tickets/new"
+            >
+              + Create ticket
+            </Link>
+          )}
         </div>
       </div>
 
-      <div className="stats-grid">
-        <article className="stat-card tone-blue">
-          <div className="stat-icon">▤</div>
-          <div><p>Total tickets</p><strong>{counts.total}</strong></div>
-        </article>
-
-        <article className="stat-card tone-red">
-          <div className="stat-icon">!</div>
-          <div><p>Open</p><strong>{counts.open}</strong></div>
-        </article>
-
-        <article className="stat-card tone-orange">
-          <div className="stat-icon">◷</div>
-          <div><p>In progress</p><strong>{counts.progress}</strong></div>
-        </article>
-
-        <article className="stat-card tone-green">
-          <div className="stat-icon">✓</div>
-          <div><p>Resolved</p><strong>{counts.resolved}</strong></div>
-        </article>
-      </div>
+      {success && (
+        <div className="notice success" role="status">
+          {success}
+          <button
+            type="button"
+            className="ticket-inline-button"
+            onClick={() => setSuccess("")}
+            aria-label="Dismiss success message"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="notice error" role="alert">
           {error}
-          <button className="ticket-inline-button" onClick={() => loadTickets()}>
+          <button
+            type="button"
+            className="ticket-inline-button"
+            onClick={() => loadTickets()}
+          >
             Try again
           </button>
         </div>
       )}
 
+      <div className="stats-grid">
+        <article className="stat-card tone-blue">
+          <div className="stat-icon">▤</div>
+          <div>
+            <p>Total tickets</p>
+            <strong>{counts.total}</strong>
+          </div>
+        </article>
+
+        <article className="stat-card tone-red">
+          <div className="stat-icon">!</div>
+          <div>
+            <p>Open</p>
+            <strong>{counts.open}</strong>
+          </div>
+        </article>
+
+        <article className="stat-card tone-orange">
+          <div className="stat-icon">◷</div>
+          <div>
+            <p>In progress</p>
+            <strong>{counts.progress}</strong>
+          </div>
+        </article>
+
+        <article className="stat-card tone-green">
+          <div className="stat-icon">✓</div>
+          <div>
+            <p>Resolved</p>
+            <strong>{counts.resolved}</strong>
+          </div>
+        </article>
+      </div>
+
       <section className="content-card">
         <div className="card-heading">
           <div>
-            <h2>All my tickets</h2>
-            <p>Search and filter your support requests.</p>
+            <h2>{isAdmin ? "Manage tickets" : "All my tickets"}</h2>
+            <p>
+              {isAdmin
+                ? "Search tickets, review details, and update status."
+                : "Search and filter your support requests."}
+            </p>
           </div>
+
           <span className="ticket-result-count">
             {filteredTickets.length} result(s)
           </span>
@@ -144,15 +241,19 @@ export default function TicketsPage() {
           <input
             type="search"
             aria-label="Search tickets"
-            placeholder="Search title, description or category..."
+            placeholder={
+              isAdmin
+                ? "Search tickets, users or categories..."
+                : "Search title, description or category..."
+            }
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
 
           <select
             aria-label="Filter by status"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(event) => setStatusFilter(event.target.value)}
           >
             <option value="All">All statuses</option>
             <option value="Open">Open</option>
@@ -163,7 +264,7 @@ export default function TicketsPage() {
           <select
             aria-label="Filter by priority"
             value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
+            onChange={(event) => setPriorityFilter(event.target.value)}
           >
             <option value="All">All priorities</option>
             <option value="High">High</option>
@@ -173,18 +274,22 @@ export default function TicketsPage() {
         </div>
 
         {loading ? (
-          <p className="loading-text">Loading your tickets...</p>
+          <p className="loading-text">Loading tickets...</p>
         ) : !error && filteredTickets.length === 0 ? (
           <div className="empty-state">
             <div>▤</div>
-            <strong>{tickets.length ? "No matching tickets" : "No tickets yet"}</strong>
+            <strong>
+              {tickets.length
+                ? "No matching tickets"
+                : "No tickets yet"}
+            </strong>
             <p>
               {tickets.length
                 ? "Try changing your search or filters."
-                : "Create your first support request to get started."}
+                : "Tickets will appear here when they are created."}
             </p>
 
-            {tickets.length === 0 && (
+            {!isAdmin && tickets.length === 0 && (
               <Link className="primary-button" to="/tickets/new">
                 + Create your first ticket
               </Link>
@@ -197,11 +302,13 @@ export default function TicketsPage() {
                 <thead>
                   <tr>
                     <th>Ticket</th>
+                    {isAdmin && <th>User</th>}
                     <th>Category</th>
                     <th>Priority</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Details</th>
+                    {isAdmin && <th>Update status</th>}
                   </tr>
                 </thead>
 
@@ -214,6 +321,15 @@ export default function TicketsPage() {
                           #{ticket._id?.slice(-6).toUpperCase()}
                         </small>
                       </td>
+
+                      {isAdmin && (
+                        <td>
+                          {ticket.createdBy?.name || "Unknown"}
+                          <small>
+                            {ticket.createdBy?.email || ""}
+                          </small>
+                        </td>
+                      )}
 
                       <td>{ticket.category || "General"}</td>
 
@@ -241,12 +357,36 @@ export default function TicketsPage() {
 
                       <td>
                         <button
+                          type="button"
                           className="ticket-view-button"
                           onClick={() => setSelectedTicket(ticket)}
                         >
                           View
                         </button>
                       </td>
+
+                      {isAdmin && (
+                        <td>
+                          <select
+                            aria-label={`Update status for ${ticket.title}`}
+                            value={ticket.status || "Open"}
+                            disabled={updatingTicketId === ticket._id}
+                            onChange={(event) =>
+                              changeStatus(ticket._id, event.target.value)
+                            }
+                          >
+                            <option value="Open">Open</option>
+                            <option value="In Progress">
+                              In Progress
+                            </option>
+                            <option value="Resolved">Resolved</option>
+                          </select>
+
+                          {updatingTicketId === ticket._id && (
+                            <small>Saving...</small>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -259,8 +399,10 @@ export default function TicketsPage() {
       {selectedTicket && (
         <div
           className="ticket-modal-backdrop"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setSelectedTicket(null);
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedTicket(null);
+            }
           }}
         >
           <section
@@ -272,11 +414,14 @@ export default function TicketsPage() {
             <div className="card-heading">
               <div>
                 <span className="eyebrow">TICKET DETAILS</span>
-                <h2 id="ticket-detail-title">{selectedTicket.title}</h2>
+                <h2 id="ticket-detail-title">
+                  {selectedTicket.title}
+                </h2>
                 <p>Reference #{selectedTicket._id}</p>
               </div>
 
               <button
+                type="button"
                 className="ticket-close-button"
                 onClick={() => setSelectedTicket(null)}
                 aria-label="Close ticket details"
@@ -285,19 +430,43 @@ export default function TicketsPage() {
               </button>
             </div>
 
+            {isAdmin && (
+              <div className="ticket-detail-grid">
+                <div>
+                  <span>Submitted by</span>
+                  <strong>
+                    {selectedTicket.createdBy?.name || "Unknown"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Email</span>
+                  <strong>
+                    {selectedTicket.createdBy?.email || "—"}
+                  </strong>
+                </div>
+              </div>
+            )}
+
             <div className="ticket-detail-grid">
               <div>
                 <span>Category</span>
-                <strong>{selectedTicket.category || "General"}</strong>
+                <strong>
+                  {selectedTicket.category || "General"}
+                </strong>
               </div>
+
               <div>
                 <span>Priority</span>
-                <strong>{selectedTicket.priority || "Medium"}</strong>
+                <strong>
+                  {selectedTicket.priority || "Medium"}
+                </strong>
               </div>
+
               <div>
                 <span>Status</span>
                 <strong>{selectedTicket.status || "Open"}</strong>
               </div>
+
               <div>
                 <span>Created</span>
                 <strong>{formatDate(selectedTicket.createdAt)}</strong>
@@ -309,7 +478,28 @@ export default function TicketsPage() {
               <p>{selectedTicket.description}</p>
             </div>
 
+            {isAdmin && (
+              <label className="ticket-status-editor">
+                Update ticket status
+                <select
+                  value={selectedTicket.status || "Open"}
+                  disabled={updatingTicketId === selectedTicket._id}
+                  onChange={(event) =>
+                    changeStatus(
+                      selectedTicket._id,
+                      event.target.value
+                    )
+                  }
+                >
+                  <option value="Open">Open</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+              </label>
+            )}
+
             <button
+              type="button"
               className="secondary-button"
               onClick={() => setSelectedTicket(null)}
             >
