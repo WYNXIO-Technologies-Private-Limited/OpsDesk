@@ -1,20 +1,25 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { NotificationProvider } from "../context/NotificationContext";
+import { useNotifications } from "../context/useNotifications";
 
 const userLinks = [
   ["▦", "Dashboard", "/dashboard"],
   ["▤", "My Tickets", "/tickets"],
   ["＋", "Create Ticket", "/tickets/new"],
+  ["♧", "Notifications", "/notifications"],
   ["♧", "Profile", "/profile"]
 ];
 const adminLinks = [
   ["▦", "Dashboard", "/admin"],
   ["▤", "All Tickets", "/admin/tickets"],
+  ["♧", "Notifications", "/admin/notifications"],
   ["♙", "Users", "/admin/users"]
 ];
 
-export default function DashboardLayout({ admin = false }) {
+function DashboardShell({ admin }) {
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const links = admin ? adminLinks : userLinks;
 
@@ -37,6 +42,7 @@ export default function DashboardLayout({ admin = false }) {
   className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
 >
               <span className="nav-icon">{icon}</span>{label}
+              {label === "Notifications" && unreadCount > 0 && <span className="nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
             </NavLink>
           ))}
         </nav>
@@ -51,4 +57,8 @@ export default function DashboardLayout({ admin = false }) {
       </main>
     </div>
   );
+}
+
+export default function DashboardLayout({ admin = false }) {
+  return <NotificationProvider><DashboardShell admin={admin} /></NotificationProvider>;
 }
